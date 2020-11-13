@@ -14,28 +14,35 @@ def calculate_scale(template_points, register_points):
     :param register_points:
     :return:
     """
-    scale = None
+    scale = 1
     return scale
+
+
+def icp_svd(template_points, register_points):
+    """
+    通过svd分解计算两个点集之间的旋转矩阵和平移向量
+    :param template_points:
+    :param register_points:
+    :return:
+    """
 
 
 def icp_quaternion(template_points, register_points):
     """
     计算两个点集之间的icp 配准
     参考https://blog.csdn.net/hongbin_xu/article/details/80537100
-    博客中的旋转矩阵写错了,需要按照论文里面的修改
+    博客中的旋转矩阵写错了,需要按照论文里面的修改 而且要转转置
     :param template_points: 模板点集 N 3
     :param register_points: 带配准点集 N 3
     :return:
     """
     row, col = template_points.shape
     mean_template_points = np.mean(template_points, axis=0)
-    print("mean_template_points is {}".format(mean_template_points))
     mean_register_points = np.mean(register_points, axis=0)
-    print("mean_register_points is {}".format(mean_register_points))
     cov = (template_points - mean_template_points).T.dot((register_points - mean_register_points)) / row
     A = cov - cov.T
-    delta = np.array([A[1,2], A[2,0], A[0,1]], dtype=np.float32).T
-    Q = np.zeros((4,4), dtype=np.float32)
+    delta = np.array([A[1, 2], A[2, 0], A[0, 1]], dtype=np.float32).T
+    Q = np.zeros((4, 4), dtype=np.float32)
     Q[0, 0] = np.trace(cov)
     Q[0, 1:] = delta
     Q[1:, 0] = delta
