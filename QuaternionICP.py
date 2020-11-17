@@ -20,12 +20,36 @@ def calculate_scale(template_points, register_points):
 
 def icp_svd(template_points, register_points):
     """
-    通过svd分解计算两个点集之间的旋转矩阵和平移向量
-    :param template_points:
-    :param register_points:
+    使用svd分解得到旋转矩阵
+    :param template_points: N 3
+    :param register_points: N 3
     :return:
     """
-
+    print('-' * 100)
+    print("icp based on svd")
+    row, col = template_points.shape
+    w = np.eye(row)
+    p = register_points.T
+    q = template_points.T
+    mean_p = p.dot(np.diagonal(w).reshape(-1, 1)) / np.trace(w)
+    mean_q = q.dot(np.diagonal(w).reshape(-1, 1)) / np.trace(w)
+    X = p - mean_p
+    Y = q - mean_q
+    S = X.dot(w).dot(Y.T)
+    U, sigma, VT = np.linalg.svd(S)
+    det_v_ut = np.linalg.det(VT.T.dot(U.T))
+    diag_matrix = np.eye(3)
+    diag_matrix[2, 2] = det_v_ut
+    rotation_matrix = VT.T.dot(diag_matrix).dot(U.T)
+    print("旋转矩阵是{}".format(rotation_matrix))
+    transformation_matrix = mean_q - rotation_matrix.dot(mean_p)
+    print("平移矩阵是{}".format(transformation_matrix))
+    error = np.mean(np.sqrt(np.sum(np.square((rotation_matrix.dot(register_points.T) + transformation_matrix).T - template_points), axis=1)))
+    print("error is {}".format(error))
+    R = rotation_matrix
+    t = transformation_matrix
+    return R, t
+    
 
 def icp_quaternion(template_points, register_points):
     """
@@ -36,6 +60,8 @@ def icp_quaternion(template_points, register_points):
     :param register_points: 带配准点集 N 3
     :return:
     """
+    print('-'*100)
+    print("icp based on quaternion")
     row, col = template_points.shape
     mean_template_points = np.mean(template_points, axis=0)
     mean_register_points = np.mean(register_points, axis=0)
@@ -59,14 +85,18 @@ def icp_quaternion(template_points, register_points):
     registered_points = rotation_matrix.dot(register_points.T).T + tranform_matrix
     error = np.mean(np.sqrt(np.sum(np.square(registered_points - template_points), axis=1)))
     print("align error is {}".format(error))
+    R = rotation_matrix
+    t = tranform_matrix
+    return R, t
 
 
 if __name__ == "__main__":
     test_points = np.random.rand(10, 3)
     rotation_vector = np.array([1, 1, 2], dtype=np.float32)
     rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
-    print("rotation_matrix is {}".format(rotation_matrix))
+    print("gt rotation_matrix is {}".format(rotation_matrix))
     transform_vector = np.array([2, 2, 2], dtype=np.float32)
-    print("正确的平移向量是{}".format(transform_vector))
+    print("gt tranformation vector {}".format(transform_vector))
     register_points = rotation_matrix.dot(test_points.T).T + transform_vector
     icp_quaternion(register_points, test_points)
+    icp_svd(register_points, test_points)
