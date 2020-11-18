@@ -76,7 +76,13 @@ def rotation_matrix_2_quaternion(rotation_matrix):
     :param rotation_matrix:
     :return:
     """
-    quaternion = None
+    R = rotation_matrix
+    q0 = np.sqrt(np.trace(R) + 1) / 2
+    q1 = (R[2, 1] - R[1, 2]) / (4 * q0)
+    q2 = (R[0, 2] - R[2, 0]) / (4 * q0)
+    q3 = (R[1, 0] - R[0, 1]) / (4 * q0)
+    quaternion = np.array([q0, q1, q2, q3], dtype=np.float32)
+    print("四元数的模是{}".format(np.linalg.norm(quaternion)))
     return quaternion
 
 
@@ -105,9 +111,9 @@ def icp_quaternion(template_points, register_points):
     lambdas, vs = np.linalg.eig(Q)
     q = vs[:, np.argmax(lambdas)]
     print("四元数是{}".format(q))
-    rotation_matrix = np.array([[np.square(q[0]) + np.square(q[1]) - np.square(q[2]) - np.square(q[3]), 2 * (q[1] * q[2] - q[0] * q[3]), 2 * (q[1] * q[3] + q[0] * q[2])],
-                                [2 * (q[1] * q[2] + q[0] * q[3]), np.square(q[0]) - np.square(q[1]) + np.square(q[2]) - np.square(q[3]), 2 * (q[2] * q[3] - q[0] * q[1])],
-                                [2 * (q[1] * q[3] - q[0] * q[2]), 2 * (q[2] * q[3] + q[0] * q[1]), np.square(q[0]) - np.square(q[1]) - np.square(q[2]) + np.square(q[3])]], dtype=np.float32)
+    rotation_matrix = quaternion_2_rotation_matrix(q)
+    q_hat = rotation_matrix_2_quaternion(rotation_matrix)
+    print("反算的四元数是{}".format(q_hat))
     print("旋转矩阵是{}".format(rotation_matrix))
     tranform_matrix = mean_template_points - rotation_matrix.dot(mean_register_points)
     print("计算出来的平移向量是{}".format(tranform_matrix))
@@ -119,17 +125,34 @@ def icp_quaternion(template_points, register_points):
     return R, t
 
 
+def print_statics(points):
+    """
+    print statics
+    :param points:
+    :return:
+    """
+    test_points_mean = np.mean(points, axis=0)
+    test_points_var = np.var(points, axis=0)
+    test_points_std = np.std(points, axis=0)
+    print("points mean var std is {}, {}, {}".format(test_points_mean, test_points_var, test_points_std))
+
+
 if __name__ == "__main__":
-    n_number = 10
+    n_number = 4
     test_points = np.random.rand(n_number, 3)
+    print_statics(test_points)
     rotation_vector = np.array([1, 1, 2], dtype=np.float32)
     rotation_matrix = cv2.Rodrigues(rotation_vector)[0]
     print("gt rotation_matrix is {}".format(rotation_matrix))
+    print("gt quaternion is {}".format(rotation_matrix_2_quaternion(rotation_matrix)))
     transform_vector = np.array([2, 2, 2], dtype=np.float32)
     print("gt tranformation vector {}".format(transform_vector))
     register_points = rotation_matrix.dot(test_points.T).T + transform_vector
+    print_statics(register_points)
     mu, sigma = 0, 0.1
     white_noise = np.random.normal(mu, sigma, size=(n_number, 3))
-    # register_points = register_points + white_noise  # add noise
-    icp_quaternion(register_points, test_points)
+    register_points = register_points + white_noise  # add noise
+    r, t = icp_quaternion(register_points, test_points)
+    rotation_vector = cv2.Rodrigues(r)[0]
+    print("rotation_vector is {}".format(rotation_vector))
     icp_svd(register_points, test_points)
