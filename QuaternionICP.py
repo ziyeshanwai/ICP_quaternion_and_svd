@@ -5,22 +5,27 @@ date: 11/12/2020
 """
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
+from sklearn.neighbors import NearestNeighbors
 
 
-def calculate_scale(template_points, register_points):
-    """
-    计算两个点集之间的scale
-    :param template_points:
-    :param register_points:
-    :return:
-    """
-    scale = 1
+def nearest_neighbor(src, dst):
+    '''
+    Find the nearest (Euclidean) neighbor in src for each point in dst
+    Input:
+        src: template points
+        dst: destination points
+    Output:
+        distances: Euclidean distances of the nearest neighbor
+        indices: src indices of the nearest neighbor with dst
+    '''
 
-    return scale
+    neigh = NearestNeighbors(n_neighbors=1)
+    neigh.fit(src)
+    distances, indices = neigh.kneighbors(dst, return_distance=True)
+    return distances.ravel(), indices.ravel()
 
 
-def icp_svd(template_points, register_points):
+def transform_svd(template_points, register_points):
     """
     使用svd分解得到旋转矩阵
     :param template_points: N 3
@@ -50,7 +55,7 @@ def icp_svd(template_points, register_points):
     print("error is {}".format(error))
     R = rotation_matrix
     t = transformation_matrix
-    return R, t
+    return R, t, error
 
 
 def quaternion_2_rotation_matrix(q):
@@ -86,7 +91,7 @@ def rotation_matrix_2_quaternion(rotation_matrix):
     return quaternion
 
 
-def icp_quaternion(template_points, register_points):
+def transform_quaternion(template_points, register_points):
     """
     计算两个点集之间的icp 配准
     参考https://blog.csdn.net/hongbin_xu/article/details/80537100
@@ -137,6 +142,25 @@ def print_statics(points):
     print("points mean var std is {}, {}, {}".format(test_points_mean, test_points_var, test_points_std))
 
 
+def icp(template_points, register_points, max_iteration=100, method):
+    """
+    icp with different method 'svd' 'quaternion'
+    :param template_points:
+    :param register_points:
+    :param max_iteration:
+    :param method:
+    :return: best rotation matrix and translation vector
+    """
+    if method == 'svd':
+
+        for i in range(max_iteration):
+            dis, ind = nearest_neighbor(template_points, register_points)
+
+
+    if method == 'quaternion':
+
+
+
 if __name__ == "__main__":
     n_number = 4
     test_points = np.random.rand(n_number, 3)
@@ -146,13 +170,13 @@ if __name__ == "__main__":
     print("gt rotation_matrix is {}".format(rotation_matrix))
     print("gt quaternion is {}".format(rotation_matrix_2_quaternion(rotation_matrix)))
     transform_vector = np.array([2, 2, 2], dtype=np.float32)
-    print("gt tranformation vector {}".format(transform_vector))
+    print("gt translation vector {}".format(transform_vector))
     register_points = rotation_matrix.dot(test_points.T).T + transform_vector
     print_statics(register_points)
     mu, sigma = 0, 0.1
     white_noise = np.random.normal(mu, sigma, size=(n_number, 3))
     register_points = register_points + white_noise  # add noise
-    r, t = icp_quaternion(register_points, test_points)
+    r, t = transform_quaternion(register_points, test_points)
     rotation_vector = cv2.Rodrigues(r)[0]
     print("rotation_vector is {}".format(rotation_vector))
-    icp_svd(register_points, test_points)
+    transform_svd((register_points, test_points)
